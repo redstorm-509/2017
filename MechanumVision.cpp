@@ -77,7 +77,7 @@ public:
 			return input;
 		}
 
-	void TargetBoiler() {
+	void TargetBoiler() { //Unused for now but just moves the robot to target the boiler tape with a consistant speed
 			bool centered = false;
 			while ((not(centered)) && (IsOperatorControl() && IsEnabled())) {
 				if (lstick.GetRawButton(1)) {
@@ -111,8 +111,8 @@ public:
 			}
 		}
 
-	int GetMaxY() {
-		int MaxY = -1;
+	int GetMaxY() { // sorts through the vision Y array and returns its max value 
+		int MaxY = -1; // returns -1 when array is empty
 		int MaxYIndex = -1;
 		if (visionY.size() > 0) {
 			for (unsigned int i=0; i < visionY.size(); i++) {
@@ -122,7 +122,7 @@ public:
 				}
 			}
 		}
-		return MaxYIndex;
+		return MaxYIndex; // this index is the top tape Y val
 	}
 
 	float GetDistance() {
@@ -132,19 +132,26 @@ public:
 		}
 		else {
 			float yval = visionY[indexval];
-			float dist = (((0.47346)*(yval)) + (44.734));
-			return dist;
+			float dist = (((0.47346)*(yval)) + (44.734)); // puts the pixel height of tape into a funtion
+			return dist; // it returns the associated distance 
+			//based on data points
 		}
 	}
 
 	float BoilerSpin() {
-		if ((visionX.size()) < 1) {
+		if ((visionX.size()) < 1) { // means that when nothing is in the vision targeting no value is returned
 			return Snotarget;
 		}
 		else {
 			float speed = ((((visionX[0] - camcenterx)/camcenterx)/(1/(Snotarget - Sminimum))));
+			/*
+			* this line takes the measured center of the X on the image and while using our current measurment
+			* What it is essentially doing is scaling the speed based on how far the camera is from the goal
+			* The first part of the equation just figures out how much speed it should have 
+			* The second part scales the first value to fit withing the max speed
+			*/
 			if (speed<0) {
-				speed -= Sminimum;
+				speed -= Sminimum; // both of these make sure the value is not too small
 			}
 			else {
 				speed += Sminimum;
@@ -154,14 +161,15 @@ public:
 	}
 
 	float AdjustDistance() {
-		float dist = GetDistance();
+		float dist = GetDistance(); // gets the current distance
 		if (dist < 0) {
 			return 0;
 		}
-		if (dist > (2 * desireddistance)) {
+		if (dist > (2 * desireddistance)) { // caps the distance at center times 2
 			dist = (2 * desireddistance);
 		}
 		float speed = ((((dist - desireddistance)/desireddistance)/(1/(distmaxspeed - distminspeed))));
+		// same as boiler spin for the rest of this function
 
 		if (speed<0) {
 			speed -= distminspeed;
@@ -173,7 +181,7 @@ public:
 		return speed;
 	}
 
-	void charge() {
+	void charge() { // Unused 
 			robotDrive.SetLeftRightMotorOutputs(-.8,.8);
 			Wait(lstick.GetZ()+.5);
 		}
