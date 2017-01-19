@@ -148,7 +148,7 @@ public:
 			* this line takes the measured center of the X on the image and while using our current measurment
 			* What it is essentially doing is scaling the speed based on how far the camera is from the goal
 			* The first part of the equation just figures out how much speed it should have 
-			* The second part scales the first value to fit withing the max speed
+			* The second part scales the first value to fit with the max speed
 			*/
 			if (speed<0) {
 				speed -= Sminimum; // both of these make sure the value is not too small
@@ -168,9 +168,10 @@ public:
 		if (dist > (2 * desireddistance)) { // caps the distance at center times 2
 			dist = (2 * desireddistance);
 		}
-		float speed = ((((dist - desireddistance)/desireddistance)/(1/(distmaxspeed - distminspeed))));
-		// same as boiler spin for the rest of this function
+		// almost the same as boiler spin for the rest of this function
 
+		float speed = ((((dist - desireddistance)/desireddistance)/(1/(distmaxspeed - distminspeed))));
+		
 		if (speed<0) {
 			speed -= distminspeed;
 		}
@@ -194,9 +195,9 @@ public:
 		robotDrive.SetSafetyEnabled(false);
 		while (IsOperatorControl() && IsEnabled())
 		{
-			camera->GetImage(frame);
-						imaqDrawShapeOnImage(frame, frame, { 10, 10, 100, 100 }, DrawMode::IMAQ_DRAW_VALUE, ShapeMode::IMAQ_SHAPE_OVAL, 0.0f);
-						CameraServer::GetInstance()->SetImage(frame);
+			camera->GetImage(frame); // Initializes Camera stuffs
+			imaqDrawShapeOnImage(frame, frame, { 10, 10, 100, 100 }, DrawMode::IMAQ_DRAW_VALUE, ShapeMode::IMAQ_SHAPE_OVAL, 0.0f);
+			CameraServer::GetInstance()->SetImage(frame);
 
 			if (rstick.GetRawButton(3)) {
 				gyro.Reset();
@@ -206,14 +207,15 @@ public:
 
 
 			if (not(rstick.GetRawButton(1))) {
-				robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), lstick.GetX(), gyro.GetAngle());
+				robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), lstick.GetX(), gyro.GetAngle());//Normal drive
 			}
 			else {
 				if (lstick.GetRawButton(1)) {
-					robotDrive.MecanumDrive_Cartesian(0, -(AdjustDistance()), BoilerSpin());
+					robotDrive.MecanumDrive_Cartesian(0, -(AdjustDistance()), BoilerSpin());//Boiler and distance
 				}
 				else {
 					robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), BoilerSpin(), gyro.GetAngle());
+					//Boiler only
 				}
 			}
 
