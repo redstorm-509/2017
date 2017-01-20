@@ -1,68 +1,35 @@
-//mechanum vision
-#include "WPILib.h"
+#include <Joystick.h>
+#include <RobotDrive.h>
+#include <SampleRobot.h>
+#include <Timer.h>
+#include <ADXRS450_Gyro.h>
+#include <WPILib.h>
 
-/**
- * This is a demo program showing how to use Mecanum control with the RobotDrive class.
- */
-class Robot: public SampleRobot
-{
+class Robot: public frc::SampleRobot {
 
-    // Channels for the wheels
-    const static int frontLeftChannel	= 2;
-    const static int rearLeftChannel	= 3;
-    const static int frontRightChannel	= 0;
-    const static int rearRightChannel	= 1;
 
-    const static int joystickChannel	= 0;
 
-	RobotDrive robotDrive;	// robot drive system
-	Joystick rstick;			// only joystick
-	Joystick lstick;
-	ADXRS450_Gyro gyro; // A gyro. Duh.
+float camcenterx = 153;
+std::vector<double> visionX;
+std::vector<double> visionY;
 
-	std::shared_ptr<NetworkTable> table;
-
-		IMAQdxSession session; //session
-		Image *frame; //camera frame
-		IMAQdxError imaqError; //imaq
-		std::unique_ptr<AxisCamera> camera; //camera
-
-	// update every 0.005 seconds/5 milliseconds.
-	float camcenterx = 153;
-	std::vector<double> visionX;
-	std::vector<double> visionY;
-
-	float Snotarget = .2;
-	float Sminimum = .05;
-	float desireddistance = 80;
-	float distmaxspeed = .3;
-	float distminspeed = .02;
-
+float Snotarget = .2;
+float Sminimum = .05;
+float desireddistance = 80;
+float distmaxspeed = .3;
+float distminspeed = .02;
 
 public:
-	Robot() :
-			robotDrive(frontLeftChannel, rearLeftChannel,
-					   frontRightChannel, rearRightChannel),	// these must be initialized in the same order
-			rstick(joystickChannel),								// as they are declared above.
-			lstick(1),
-			gyro(SPI::Port::kOnboardCS0),
-			table(NetworkTable::GetTable("GRIP/BoilerReport1"))
-			{
-		robotDrive.SetExpiration(0.1);
-		robotDrive.SetInvertedMotor(RobotDrive::kFrontRightMotor, true);	// invert the left side motors
-		robotDrive.SetInvertedMotor(RobotDrive::kRearRightMotor, true);	// you may need to change or remove this to match your robot
-	}
+	Robot() {
 
-	void RobotInit() override {
-		{	CameraServer::GetInstance()->SetQuality(50);
-			CameraServer::GetInstance()->StartAutomaticCapture("cam0");
-			CameraServer::GetInstance()->StartAutomaticCapture("cam1");
-			CameraServer::GetInstance()->StartAutomaticCapture("cam2");}
-			// create an image
-			frame = imaqCreateImage(IMAQ_IMAGE_RGB, 0);
-			// open the camera at the IP address assigned. This is the IP address that the camera
-			// can be accessed through the web interface.
-			camera.reset(new AxisCamera("axis-camera.local"));
+
+		robotDrive.SetExpiration(0.1);
+
+		// Invert the left side motors
+		robotDrive.SetInvertedMotor(RobotDrive::kFrontRightMotor, true);
+
+		// You may need to change or remove this to match your robot
+		robotDrive.SetInvertedMotor(RobotDrive::kRearRightMotor, true);
 	}
 
 	void CAM() {
@@ -75,40 +42,6 @@ public:
 				input = input * -1;
 			}
 			return input;
-		}
-
-	void TargetBoiler() {
-			bool centered = false;
-			while ((not(centered)) && (IsOperatorControl() && IsEnabled())) {
-				if (lstick.GetRawButton(1)) {
-					charge();
-				}
-				float RM = 0;
-				float LM = 0;
-				if ((visionX.size()) < 1) {
-					RM = -.2;
-					LM = .2;
-				}
-				else {
-					if (ABS(camcenterx - visionX[0])>10) {
-						float speed = (((camcenterx - visionX[0])/camcenterx)/5);
-						if (speed<0) {
-							speed = -.15;
-						}
-						else {
-							speed = .15;
-						}
-						RM = -(speed);
-						LM = speed;
-					}
-					else {
-						centered = true;
-					}
-				}
-				robotDrive.SetLeftRightMotorOutputs(-LM,RM);
-				CAM();
-				Wait(0.005);
-			}
 		}
 
 	int GetMaxY() {
@@ -173,29 +106,12 @@ public:
 		return speed;
 	}
 
-	void charge() {
-			robotDrive.SetLeftRightMotorOutputs(-.8,.8);
-			Wait(lstick.GetZ()+.5);
-		}
-
-	/**
-	 * Runs the motors with Mecanum drive.
-	 */
-	void OperatorControl()
-	{
+	void OperatorControl() override {
 		robotDrive.SetSafetyEnabled(false);
-		while (IsOperatorControl() && IsEnabled())
-		{
-			camera->GetImage(frame);
-						imaqDrawShapeOnImage(frame, frame, { 10, 10, 100, 100 }, DrawMode::IMAQ_DRAW_VALUE, ShapeMode::IMAQ_SHAPE_OVAL, 0.0f);
-						CameraServer::GetInstance()->SetImage(frame);
-
+		while (IsOperatorControl() && IsEnabled()) {
 			if (rstick.GetRawButton(3)) {
 				gyro.Reset();
 			}
-        	// Use the joystick X axis for lateral movement, Y axis for forward movement, and Z axis for rotation.
-        	// This sample does not use field-oriented drive, so the gyro input is set to zero.
-
 
 			if (not(rstick.GetRawButton(1))) {
 				robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), lstick.GetX(), gyro.GetAngle());
@@ -209,15 +125,27 @@ public:
 				}
 			}
 
-
-
 			CAM();
 
-			SmartDashboard::PutNumber("TargetHeight",GetDistance());
-
-			Wait(0.005); // wait 5ms to avoid hogging CPU cycles
+			frc::Wait(0.005); // wait 5ms to avoid hogging CPU cycles
 		}
 	}
+
+private:
+	// Channels for the wheels
+	static constexpr int kFrontLeftChannel = 2;
+	static constexpr int kRearLeftChannel = 3;
+	static constexpr int kFrontRightChannel = 1;
+	static constexpr int kRearRightChannel = 0;
+
+	// Robot drive system
+	frc::RobotDrive robotDrive { kFrontLeftChannel, kRearLeftChannel,
+			kFrontRightChannel, kRearRightChannel };
+	// Only joystick
+	frc::Joystick rstick { 0 };
+	frc::Joystick lstick { 1 };
+	ADXRS450_Gyro gyro { SPI::Port::kOnboardCS0 };
+	std::shared_ptr<NetworkTable> table { NetworkTable::GetTable("GRIP/BoilerReport1") };
 
 };
 
