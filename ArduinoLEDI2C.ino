@@ -10,7 +10,7 @@ char receivedValue;
 int CURRENT_STATE = 1;
 uint16_t RAINBOW_VAL = 0;
 int flashingvalue = 0;
-int flashingstate = 1; //1 is on 0 is off in flash function
+int flashingstate = 1;
 int currentteam = 0;
 
 int defaultwhite = 0;
