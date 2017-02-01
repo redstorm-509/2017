@@ -20,7 +20,6 @@ int blueteam = 3;
 int loading = 4;
 int shooting = 5;
 int endactions = 6;
-int teamcolor = 7;
 
 
 
@@ -45,18 +44,6 @@ void loop(){
   }
   if (CURRENT_STATE == shooting) {
     flash(strip.Color(0,245,0));
-  }
-  
-  if (CURRENT_STATE == teamcolor) {
-    if (currentteam == 1) {
-      colorWipe(strip.Color(245,0,0),50); // red
-    }
-    else if (currentteam == 2) {
-      colorWipe(strip.Color(0,0,245),50); // blue
-    }
-    else {
-      InstantColor(strip.Color(200,200,200)); // white
-    }
   }
   
   if (CURRENT_STATE != colorValue) {
