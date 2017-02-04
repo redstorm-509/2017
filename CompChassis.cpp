@@ -8,6 +8,7 @@
 #include <math.h>
 #include <WPILib.h>
 #include <I2C.h>
+#include <Servo.h>
 
 class Robot: public frc::SampleRobot {
 
@@ -20,9 +21,11 @@ std::vector<double> visionY;
 float Snotarget = .2;
 float Sminimum = .05;
 float desireddistance = 80;
-float distmaxspeed = .3;
-float distminspeed = .02;
+float distmaxspeed = .6;
+float distminspeed = .15;
 float PI = 3.14159;
+
+bool shootingStoped = false;
 
 int i2cwhite = 0;
 int i2crainbow = 1;
@@ -32,7 +35,7 @@ int i2cloading = 4;
 int i2cshooting = 5;
 int i2cendactions = 6;
 
-float gyroenabled = false;
+float gyroenabled = true;
 
 public:
 	Robot() {
@@ -47,17 +50,17 @@ public:
 	//	robotDrive.SetInvertedMotor(RobotDrive::kRearRightMotor, true);
 	}
 
-	/*void CAM() {
-				visionX = table->GetNumberArray("centerX", llvm::ArrayRef<double>());
-				visionY = table->GetNumberArray("centerY", llvm::ArrayRef<double>());
-	}*/
+	void CAM() {
+			visionX = table->GetNumberArray("centerX", llvm::ArrayRef<double>());
+			visionY = table->GetNumberArray("centerY", llvm::ArrayRef<double>());
+		}
 
 	float ABS(float input) {
-			if (input<0) {
-				input = input * -1;
-			}
-			return input;
+		if (input<0) {
+			input = input * -1;
 		}
+		return input;
+	}
 
 	int GetMaxY() {
 		int MaxY = -1;
@@ -120,22 +123,79 @@ public:
 		SmartDashboard::PutNumber("Speed",speed);
 		return speed;
 	}
-	
+
+	void Accessories() {
+		bool loadingpressed = opstick.GetRawButton(3);
+		bool shootingpressed = (opstick.GetRawButton(5) && opstick.GetRawButton(6));
+		if (loadingpressed){
+			loader.Set(.95);
+		}
+		else{
+			loader.Set(0);
+		}
+
+		if (shootingpressed){
+			if (walter.Get() == 0){
+				walter.Start();
+
+				shooter.Set(.95);
+			}
+			if (walter.Get() >= .1){
+			servo.Set(.4);
+			agitator.Set(.5);
+
+			walter.Stop();
+			shootingStoped = true;
+			}
+
+		}
+
+		else{
+
+
+			agitator.Set(0);
+			servo.Set(0);
+
+			if (herbert.Get() == 0 && shootingStoped == true){
+				herbert.Start();
+
+				shootingStoped = false;
+			}
+			if (herbert.Get() >= 2){
+			shooter.Set(0);
+
+			herbert.Stop();
+			herbert.Reset();
+			}
+
+			walter.Stop();
+			walter.Reset();
+
+		}
+
+		///////////////////////////// I2C ////////////////////////////
+		if (shootingpressed) {
+			ChangeColor(i2cshooting);
+		}
+		else if (loadingpressed) {
+			ChangeColor(i2cloading);
+		}
+		else {
+			ChangeColor(i2cendactions);
+		}
+	}
+
 	void ChangeColor(uint8_t val) {
 			Wire.Transaction(&val,1,NULL,0);
 	}
 
 
 	void CanMechanum(float RX, float RY, float LX, float robotangle){
-		RX = -RX;
+		//RX = -RX;
 		float mag = sqrt((RY*RY)+(RX*RX));
+		float joyangle = 0;
 		if (gyroenabled) {
-			//robotangle = ((360/4.8)*(-(robotangle)));
 			robotangle = (((PI)/180)*robotangle);
-			SmartDashboard::PutNumber("Initial Gyro",(robotangle/PI));
-			SmartDashboard::PutNumber("Initial RY",RY);
-			SmartDashboard::PutNumber("Initial RX",RX);
-			//SmartDashboard::PutNumber("Modified Gyro",robotangle);
 			while ((robotangle >= (2*PI)) or (robotangle < 0)){
 				if (robotangle >= (2*PI)){
 					robotangle = robotangle - (2*PI);
@@ -145,93 +205,30 @@ public:
 					robotangle = robotangle + (2*PI);
 				}
 			}
-			SmartDashboard::PutNumber("GyroAngle",robotangle);
-			float joyangle = 0;
+			SmartDashboard::PutNumber("Gyro",robotangle*(180/PI));
 			float dif = 0;
-			SmartDashboard::PutNumber("Magnitude",mag);
-			//angle = angle * (PI/180);
 			if ((RX>=0) && (RY>0)) { // Top Right
-				SmartDashboard::PutBoolean("TopRightQuad",true);
-				SmartDashboard::PutBoolean("BottomRightQuad",false);
-				SmartDashboard::PutBoolean("BottomLeftQuad",false);
-				SmartDashboard::PutBoolean("TopLeftQuad",false);
-				joyangle = 0;
-				//if (not(RX==0)) {
-					joyangle = atan(RX/RY) + joyangle;
-				//}
-				/*else {
-					//joyangle = ((180/PI)*joyangle);
-				}*/
+				joyangle = atan(RX/RY) + 0;
 				dif = joyangle - robotangle;
-				//dif = -dif;
-				RY = mag*cos(dif);
-				RX = mag*sin(dif);
 			}
 			else if ((RX>0) && (RY<=0)) { // Bottom Right
-				SmartDashboard::PutBoolean("TopRightQuad",false);
-				SmartDashboard::PutBoolean("BottomRightQuad",true);
-				SmartDashboard::PutBoolean("BottomLeftQuad",false);
-				SmartDashboard::PutBoolean("TopLeftQuad",false);
-				joyangle = ((PI)/2);
-				//if (not(RY==0)) {
-					//joyangle = 90;
-					//joyangle = 0;
-					joyangle = (-atan(RY/RX)) + joyangle;
-				//}
-				/*else {
-					//joyangle = -((180/PI)*joyangle);
-				}*/
+				joyangle = (atan((-RY)/RX)) + ((PI)/2);
 				dif = joyangle - robotangle;
-				//dif = -dif;
-				RX = mag*sin(dif);
-				RY = mag*cos(dif);
 			}
 			else if ((RX<=0) && (RY<0)) { // Bottom Left
-				SmartDashboard::PutBoolean("TopRightQuad",false);
-				SmartDashboard::PutBoolean("BottomRightQuad",false);
-				SmartDashboard::PutBoolean("BottomLeftQuad",true);
-				SmartDashboard::PutBoolean("TopLeftQuad",false);
-				joyangle = (PI);
-				//if (not(RX==0)) {
-					joyangle = atan(RX/RY) + joyangle;
-					//joyangle = 180;
-					//joyangle = 0;
-				//}
-				/*else {
-
-					//joyangle = ((180/PI)*joyangle);
-				}*/
+				joyangle = atan((-RX)/(-RY)) + (PI);
 				dif = joyangle - robotangle;
-				//dif = -dif;
-				RY = mag*cos(dif);
-				RX = mag*sin(dif);
 			}
 			else if ((RX<0) && (RY>=0)) { // Top Left
-				SmartDashboard::PutBoolean("TopRightQuad",false);
-				SmartDashboard::PutBoolean("BottomRightQuad",false);
-				SmartDashboard::PutBoolean("BottomLeftQuad",false);
-				SmartDashboard::PutBoolean("TopLeftQuad",true);
-				joyangle = ((3*PI)/2);
-				//if (not(RY==0)) {
-					//joyangle = 270;
-					//joyangle = 0;
-					joyangle = atan(RY/RX) + joyangle;
-				//}
-				/*else {
-					//joyangle = -((180/PI)*joyangle);
-				}*/
+				joyangle = atan(RY/(-RX)) + ((3*PI)/2);
 				dif = joyangle - robotangle;
-				//dif = -dif;
-				RX = mag*sin(dif);
-				RY = -mag*cos(dif);
 			}
-			SmartDashboard::PutNumber("joyangle",(joyangle/PI));
-			SmartDashboard::PutNumber("Dif",(dif/PI));
-			SmartDashboard::PutNumber("Final RY",RY);
-			SmartDashboard::PutNumber("Final RX",RX);
+			SmartDashboard::PutNumber("Dif",dif*(180/PI));
+			RY = mag * cos(dif);
+			RX = mag * sin(dif);
 		}
 
-
+		SmartDashboard::PutNumber("JoyAngle",joyangle*(180/PI));
 
 		mag = sqrt((RY*RY)+(RX*RX));
 
@@ -251,27 +248,12 @@ public:
 			maxval = rrVal;
 		}
 
-		/*std::vector<float> Values;
-		float MaxVal = -1;
-		int indexVal = 0;
-		for (unsigned int i=0; i < Values.size(); i++) {
-			if (Values[i] > MaxVal){
-				MaxVal = Values[i];
-				indexVal = i;
-			}
-		}*/
-
 		if (ABS(maxval) > 1){
 			lfVal = ((lfVal / ABS(maxval))*(mag/sqrt(2)));
 			lrVal = ((lrVal / ABS(maxval))*mag/sqrt(2));
 			rfVal = ((rfVal / ABS(maxval))*mag/sqrt(2));
 			rrVal = ((rrVal / ABS(maxval))*mag/sqrt(2));
 		}
-
-		SmartDashboard::PutNumber("Left Front",lfVal);
-		SmartDashboard::PutNumber("Left Rear",lrVal);
-		SmartDashboard::PutNumber("Right Front",rfVal);
-		SmartDashboard::PutNumber("Right Rear",rrVal);
 
 		lfm.Set(lfVal);
 		lrm.Set(lrVal);
@@ -282,9 +264,9 @@ public:
 	void OperatorControl() override {
 		//robotDrive.SetSafetyEnabled(false);
 		//gyro.Reset();
-		
+
 		ChangeColor(i2credteam);
-		
+
 		while (IsOperatorControl() && IsEnabled()) {
 
 			if (rstick.GetRawButton(3)) {
@@ -293,42 +275,39 @@ public:
 			if (rstick.GetRawButton(2)) {
 				gyro.Calibrate();
 			}
-			/*if (rstick.GetRawButton(4)) {
-				lfm.Set(-.5);
-				lrm.Set(.5);
-				rfm.Set(-.5);
-				rrm.Set(.5);
+
+			Accessories();
+
+		//	CanMechanum(rstick.GetX(), -rstick.GetY(), (lstick.GetX()/2), gyro.GetAngle());
+
+			if (rstick.GetRawButton(4)) {
+				rfm.Set(-.7);
+				lfm.Set(-.7);
+				rrm.Set(.7);
+				lrm.Set(.7);
 			}
 			else if (rstick.GetRawButton(5)) {
-				lfm.Set(.5);
-				lrm.Set(-.5);
-				rfm.Set(.5);
-				rrm.Set(-.5);
+				rfm.Set(.7);
+				lfm.Set(.7);
+				rrm.Set(-.7);
+				lrm.Set(-.7);
 			}
 			else {
-				lfm.Set(0);
-				lrm.Set(0);
-				rrm.Set(0);
-				rfm.Set(0);
-			}*/
-
-			CanMechanum(rstick.GetX(), -rstick.GetY(), (lstick.GetX()/2), gyro.GetAngle());
-
-			//if (not(rstick.GetRawButton(1))) {
-				//CanMechanum();
-
-				//robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), lstick.GetX(), gyro.GetAngle());
-			//}
-			/*else {
-				if (lstick.GetRawButton(1)) {
-					robotDrive.MecanumDrive_Cartesian(0, -(AdjustDistance()), BoilerSpin());
+				if (not(rstick.GetRawButton(1))) {
+					CanMechanum(rstick.GetX(), -rstick.GetY(), (lstick.GetX()/2), gyro.GetAngle());
 				}
 				else {
-					robotDrive.MecanumDrive_Cartesian(rstick.GetX(), rstick.GetY(), BoilerSpin(), gyro.GetAngle());
+					if (lstick.GetRawButton(1)) {
+						CanMechanum((AdjustDistance()), 0, BoilerSpin(), 0);
+					}
+					else {
+						CanMechanum(rstick.GetX(), -rstick.GetY(), BoilerSpin(), gyro.GetAngle());
+					}
 				}
-			}*/
+			}
 
-			//CAM();
+
+			CAM();
 
 			frc::Wait(0.005); // wait 5ms to avoid hogging CPU cycles
 		}
@@ -341,18 +320,29 @@ private:
 	static constexpr int kRearLeftChannel = 22;
 	static constexpr int kFrontRightChannel = 20;
 	static constexpr int kRearRightChannel = 24;
+	static constexpr int kShooterChannel = 25;
+	static constexpr int kloadingChannel = 26;
+	static constexpr int kAgitatorChannel = 27;
 
 	// Robot drive system
 
 	//CANTalon::CANTalon rfm { 22 };
 
-	CanTalonSRX rfm { kFrontRightChannel };
+	/*CanTalonSRX rfm { kFrontRightChannel };
 	CanTalonSRX rrm { kRearRightChannel };
 	CanTalonSRX lfm { kFrontLeftChannel };
-	CanTalonSRX lrm { kRearLeftChannel };
+	CanTalonSRX lrm { kRearLeftChannel };*/
+	CanTalonSRX shooter { kShooterChannel };
+	CanTalonSRX loader { kloadingChannel };
+	CanTalonSRX agitator { kAgitatorChannel };
 
-	// TRUMAN NOTE THAT "CANTalon.h" with "CANTalon" instead of "CanTalonSRX" in the lines above does
-	// not error, however it doesn't run the motors. Just a note
+	frc::Talon lfm { 0 };
+	frc::Talon lrm { 1 };
+	frc::Talon rfm { 2 };
+	frc::Talon rrm { 3 };
+
+	frc::Servo servo { 0 };
+
 
 	//frc::RobotDrive robotDrive { lfm, lrm,
 	//	rfm, rrm };
@@ -363,9 +353,12 @@ private:
 	// Only joystick
 	frc::Joystick rstick { 0 };
 	frc::Joystick lstick { 1 };
+	frc::Joystick opstick { 2 };
+	frc::Timer walter;
+	frc::Timer herbert;
 	ADXRS450_Gyro gyro { SPI::Port::kOnboardCS0 };
-	//std::shared_ptr<NetworkTable> table { NetworkTable::GetTable("GRIP/BoilerReport1") };
-	
+	std::shared_ptr<NetworkTable> table { NetworkTable::GetTable("GRIP/BoilerReport1") };
+
 	//I2C initilazation
 	I2C Wire { I2C::Port::kOnboard,1 };
 
