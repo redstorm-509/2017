@@ -5,6 +5,8 @@
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(30, PIN);
 
+const int waitwipe = 17;
+
 int colorValue = 1;
 char receivedValue;
 int CURRENT_STATE = 1;
@@ -20,6 +22,10 @@ int blueteam = 3;
 int loading = 4;
 int shooting = 5;
 int endactions = 6;
+int hastarget = 7;
+int notarget = 8;
+bool targetvisible = false;
+bool lasttargetvisible = false;
 
 
 
@@ -30,9 +36,9 @@ void setup() {
   
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
-  strip.setBrightness(32);
+  strip.setBrightness(128);
   for(uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, 200, 200, 200);
+    strip.setPixelColor(i, 100, 100, 100);
   }
   strip.show();
 
@@ -45,17 +51,35 @@ void loop(){
   if (CURRENT_STATE == shooting) {
     flash(strip.Color(0,245,0));
   }
+
+  if (targetvisible != lasttargetvisible) {
+    if (CURRENT_STATE == endactions) {
+      lasttargetvisible = targetvisible;
+      if (currentteam == 1 && targetvisible == false) {
+        colorWipe(strip.Color(245,0,0),waitwipe); // red
+      }
+      else if (currentteam == 2  && targetvisible == false) {
+        colorWipe(strip.Color(0,0,245),waitwipe); // blue
+      }
+      else if (targetvisible == true){
+        colorWipe(strip.Color(0,245,0), waitwipe); // green
+      }
+      else {
+        InstantColor(strip.Color(100,100,100)); // white
+      }
+    }
+  }
   
   if (CURRENT_STATE != colorValue) {
     if (colorValue == defaultwhite) {
-      InstantColor(strip.Color(200,200,200)); // white
+      InstantColor(strip.Color(100,100,100)); // white
     }
     else if (colorValue == redteam) {
-      colorWipe(strip.Color(245, 0, 0), 50); // red
+      //colorWipe(strip.Color(245, 0, 0), waitwipe); // red
       currentteam = 1;
     }
     else if (colorValue == blueteam) {
-      colorWipe(strip.Color(0, 0, 245), 50); // blue
+      //colorWipe(strip.Color(0, 0, 245), waitwipe); // blue
       currentteam = 2;
     }
     else if (colorValue == loading) {
@@ -64,15 +88,20 @@ void loop(){
     else if (colorValue == shooting) {
       InstantColor(strip.Color(0,245,0)); // green
     }
+    
     else if (colorValue == endactions) {
-      if (currentteam == 1) {
-        colorWipe(strip.Color(245,0,0),50); // red
+      lasttargetvisible = targetvisible;
+      if (currentteam == 1 && targetvisible == false) {
+        colorWipe(strip.Color(245,0,0),waitwipe); // red
       }
-     else if (currentteam == 2) {
-        colorWipe(strip.Color(0,0,245),50); // blue
+     else if (currentteam == 2  && targetvisible == false) {
+        colorWipe(strip.Color(0,0,245),waitwipe); // blue
+      }
+      else if (targetvisible == true){
+        colorWipe(strip.Color(0,245,0), waitwipe); // green
       }
      else {
-        InstantColor(strip.Color(200,200,200)); // white
+        InstantColor(strip.Color(100,100,100)); // white
       }
     }
     
@@ -85,7 +114,17 @@ void Input(int RoboValue){
 
   if (Wire.available()){
 
-    colorValue = Wire.read();
+    int newValue = Wire.read();
+
+    if (newValue == hastarget) {
+      targetvisible = true;
+    }
+    else if (newValue == notarget) {
+      targetvisible = false;
+    }
+    else {
+      colorValue = newValue;
+    }
     
 /*
     Serial.print("colorValue");
@@ -115,7 +154,7 @@ void colorWipe(uint32_t c, uint8_t wait) {
 
 void flash(uint32_t c) {
   flashingvalue = (flashingvalue + 1);
-  if (flashingvalue >= 20) {
+  if (flashingvalue >= 10) {
     flashingvalue = 0;
     if (flashingstate == 1) {
       InstantColor(strip.Color(0,0,0)); // off
