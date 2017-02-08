@@ -15,29 +15,29 @@ public:
 		while (IsOperatorControl() && IsEnabled()) {
 
 			if (opstick.GetRawButton(1)){
-				ChangeColor(2);
+				ChangeColor(2); //red team
 			}
 			else if(opstick.GetRawButton(2)){
-				ChangeColor(3);
+				ChangeColor(3); //blue team
 			}
 			else if (opstick.GetRawButton(3)){
-				ChangeColor(7);
+				ChangeColor(7); //has target
 			}
 			else if (opstick.GetRawButton(4)){
-				ChangeColor(8);
+				ChangeColor(8); //no target
 			}
 			else if(opstick.GetRawButton(6)){
-				ChangeColor(4);
+				ChangeColor(4); //loading
 			}
 			else if(opstick.GetRawButton(7)){
-				ChangeColor(5);
+				ChangeColor(5); //shooting
 			}
 			else {
-				ChangeColor(6);
+				ChangeColor(6); //end action
 			}
 
 		}
-		ChangeColor(1);
+		ChangeColor(1); //rainbow
 	}
 private:
 
