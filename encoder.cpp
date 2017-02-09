@@ -18,6 +18,11 @@
 class Robot: public frc::SampleRobot {
 public:
 
+	//  link to how to use the encoder
+	/*
+	https://wpilib.screenstepslive.com/s/4485/m/13810/l/241875-encoders-measuring-rotation-of-a-wheel-or-other-shaft
+	*/
+	
 	int count;
 	double distance;
 	double period;
