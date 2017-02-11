@@ -4,11 +4,8 @@
 #include <Timer.h>
 #include <WPILib.h>
 
-float currentRate;
-float wantedRate = 600;
-float maximumRate = 11000;
-float speedIncrease;
-float newSpeed;
+float Ed = 6000;
+float Em = 11000;
 
 /**
  * This sample program shows how to control a motor using a joystick. In the
@@ -28,19 +25,17 @@ public:
 	 */
 	void encoder(){
 
-		currentRate = sampleEncoder->GetRate();
+		float Ec = sampleEncoder->GetRate();
 
-		speedIncrease = (wantedRate - currentRate) / maximumRate;
+		float Vd = ((Ed*Ed)/(Ec*Em));
 
-		newSpeed = (speedIncrease + m_motor.GetSpeed());
-		if (newSpeed > 1){
-			newSpeed = 1;
+		if (Vd>1) {
+			Vd = 1;
 		}
-		else if (newSpeed < -1){
-			newSpeed = -1;
+		if (Vd<-1) {
+			Vd = -1;
 		}
-		SmartDashboard::PutNumber("New Speed",newSpeed);
-		m_motor.Set(0);
+		m_motor.Set(Vd);
 
 	}
 
