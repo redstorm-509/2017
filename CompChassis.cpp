@@ -3,8 +3,13 @@
 #include <math.h>
 
 /*
- * Get Distance function
- * Preferably calibrate wheel speeds for carpet
+ * DESIRED ENCODER VALUE IS 8976
+ * DESIRED Y VALUE IS 207
+ * FIND DESIRED X VALUE
+ * AdjustToY() is untested, but should work?
+ *
+ * FYI I changed GetDistance() so it doesn't actually return a distance
+ * oops
  */
 
 
@@ -12,19 +17,26 @@ class Robot: public frc::SampleRobot {
 
 
 
-float shootercenterx = 153;
+float shootercenterx = 162;
 std::vector<double> visionX;
 std::vector<double> visionY;
 
-float Snotarget = .2;
-float Sminimum = .05;
-float desireddistance = 80;
+float Snotarget = .3;
+float Sminimum = .15;
+float desireddistance = 124.5;
 float distmaxspeed = .6;
-float distminspeed = .08;
+float distminspeed = .12;
+float TurnMax = .4;
+float TurnMin = .15;
+
+int desiredYVal = 207;
 
 float PI = 3.14159;
 
 bool IsShooting = false;
+//bool autoComplete = false;
+
+bool ManualShooter = false;
 
 int EncoderDelayLoop = 0;
 float ShooterCurrentSpeed = 0;
@@ -46,47 +58,56 @@ public:
 	}
 
 	void SetShooter(float DesiredEncoder) {
-		SmartDashboard::PutBoolean("Wtf",true);
 		if (EncoderDelayLoop == 0) {
 
 			float CurrentEncoder = sampleEncoder->GetRate();
-			SmartDashboard::PutNumber("CurrentE",CurrentEncoder);
-			SmartDashboard::PutNumber("ShooterCurrentSpeed",ShooterCurrentSpeed);
+			SmartDashboard::PutNumber("Current Encoder", CurrentEncoder);
 
-			float DesiredSpeed;
+			float DesiredSpeed = rstick.GetZ();
 
-			if ((ShooterCurrentSpeed==0) || (CurrentEncoder <= 0)) {
-				DesiredSpeed = -.45;
-			}
-			else {
-				DesiredSpeed = -((ShooterCurrentSpeed*DesiredEncoder)/(CurrentEncoder)); // fucking genius
-			}
+			if (not(ManualShooter)) {
+				if ((ShooterCurrentSpeed==0) || (CurrentEncoder <= 0)) {
+					DesiredSpeed = -.45;
+				}
+				else {
+					DesiredSpeed = ((ShooterCurrentSpeed*DesiredEncoder)/(CurrentEncoder)); // fucking genius
+				}
 
-			if (DesiredSpeed>1) {
-				DesiredSpeed = 1;
+				if (DesiredSpeed>1) {
+					DesiredSpeed = 1;
+				}
+				if (DesiredSpeed<-1) {
+					DesiredSpeed = -1;
+				}
+				ShooterCurrentSpeed = DesiredSpeed;
 			}
-			if (DesiredSpeed<-1) {
-				DesiredSpeed = -1;
+			if (DesiredSpeed!=-.45) {
+				SmartDashboard::PutNumber("Speed",DesiredSpeed);
 			}
-			ShooterCurrentSpeed = DesiredSpeed;
-			SmartDashboard::PutNumber("Shooter",DesiredSpeed);
 			m_shooter.Set(DesiredSpeed);
+			//m_shooter.Set(rstick.GetZ());
 		}
 		EncoderDelayLoop += 1;
-		if (EncoderDelayLoop >= 10) {
+		if (EncoderDelayLoop >= 15) {
 			EncoderDelayLoop = 0;
 		}
 	}
 
 	void CAM() {
 			visionX = table->GetNumberArray("centerX", llvm::ArrayRef<double>());
+			if (visionX.size()>0) {
+				SmartDashboard::PutNumber("VisionX",visionX[0]);
+			}
 			visionY = table->GetNumberArray("centerY", llvm::ArrayRef<double>());
-			if (visionX.size() > 0){
+			if (visionY.size()>0) {
+				SmartDashboard::PutNumber("VisionY",visionY[0]);
+			}
+			/*if (visionX.size() > 0){
 				ChangeColor(i2chastarget);
 			}
 			else {
 				ChangeColor(i2cnotarget);
-			}
+			}*/
 		}
 
 	float ABS(float input) {
@@ -117,12 +138,12 @@ public:
 		}
 		else {
 			float yval = visionY[indexval];
-			SmartDashboard::PutNumber("Y Center",yval);
 			if (visionX.size() > 0) {
-				SmartDashboard::PutNumber("X Center", visionX[0]);
+				//SmartDashboard::PutNumber("X Center", visionX[0]);
 			}
-			float dist = (((0.47346)*(yval)) + (44.734));
-			return dist;
+			//float dist = (((0.47346)*(yval)) + (44.734));
+			//return dist;
+			return yval;
 		}
 	}
 
@@ -142,6 +163,26 @@ public:
 		}
 	}
 
+	float AdjustToY() {
+		float yval = GetDistance();
+		if (yval < 0) {
+			return 0;
+		}
+		if (yval > 2 * desiredYVal) {
+			yval = 2 * desiredYVal;
+		}
+		float speed = ((((yval - desiredYVal)/desiredYVal)/(1/(distmaxspeed - distminspeed))));
+
+		if (speed<0) {
+			speed -= distminspeed;
+		}
+		else {
+			speed += distminspeed;
+		}
+		return speed;
+
+	}
+
 	float AdjustDistance() {
 		float dist = GetDistance();
 		if (dist < 0) {
@@ -158,52 +199,68 @@ public:
 		else {
 			speed += distminspeed;
 		}
-		SmartDashboard::PutNumber("Speed",speed);
 		return speed;
 	}
 
 	int GetDesiredEncoder() {
 		float dist = GetDistance();
 		//math
+		//int DesiredEncoder = (rstick.GetZ() * 10000);
 		int DesiredEncoder = (rstick.GetZ() * 10000);
-		SmartDashboard::PutNumber("DesiredEncoder",DesiredEncoder);
+		SmartDashboard::PutNumber("Current Ed",rstick.GetZ() * 10000);
 		return DesiredEncoder;
 	}
 
 	void Accessories() {
+		//bool mouseTrap = false;
 		bool loadingpressed = opstick.GetRawButton(3);
 		bool shootingpressed = (opstick.GetRawButton(5) && opstick.GetRawButton(6));
+/*
+		if (fatherTime.Get() >= 105 && (opstick.GetThrottle() >= .4 || mouseTrap) && autoComplete){
+			m_climber.Set(-opstick.GetThrottle());
+			mouseTrap = true;
+		}
+		else if ((opstick.GetThrottle() >= .4 || mouseTrap) && !autoComplete){
+			m_climber.Set(-opstick.GetThrottle());
+			mouseTrap = true;
+		}
+		else {
+			m_climber.Set(0);
+		}*/
+		m_climber.Set(-opstick.GetThrottle());
+
 		if (loadingpressed){
-			m_loader.Set(.95);
+			m_loader.Set(-.95);
 		}
 		else{
 			m_loader.Set(0);
 		}
-		int DesiredEncoderVal = 6000;
+		int DesiredEncoderVal = GetDesiredEncoder();//6000;
 		if (visionX.size() > 0) {
 			DesiredEncoderVal = GetDesiredEncoder();
 		}
 
 		if (shootingpressed){
-			SmartDashboard::PutBoolean("Shooting",true);
 			SetShooter(DesiredEncoderVal);
 			if (walter.Get() == 0){
 				walter.Start();
 			}
-			if (walter.Get() >= .1){
-			servo.Set(.4);
-			m_agitator.Set(.5);
+			if (walter.Get() >= .5){
+			hopperstop.Set(1);
+			m_agitator.Set(-.7);
 
 			walter.Stop();
 			IsShooting = true;
 			}
+			else if (walter.Get() >= .4){
+			hopperstop.Set(0);
+			}
 		}
 
 		else{
-			SmartDashboard::PutBoolean("Shooting",false);
 			EncoderDelayLoop = 0;
 			m_agitator.Set(0);
-			servo.Set(0);
+			hopperstop.Set(.5);
 
 			if (herbert.Get() == 0 && IsShooting == true){
 				herbert.Start();
@@ -251,7 +308,6 @@ public:
 	void ChangeColor(uint8_t val) {
 			Wire.Transaction(&val,1,NULL,0);
 	}
-
 
 	void CanMechanum(float RX, float RY, float LX, float robotangle){
 		float mag = sqrt((RY*RY)+(RX*RX));
@@ -320,6 +376,9 @@ public:
 	}
 
 	void OperatorControl() override {
+		fatherTime.Reset();
+		fatherTime.Start();
+		loaderstop.Set(.56);
 		while (IsOperatorControl() && IsEnabled()) {
 			if (rstick.GetRawButton(3)) {
 				gyro.Reset();
@@ -346,7 +405,10 @@ public:
 				m_lr.Set(-.7);
 			}
 			else {
-				if (not(rstick.GetRawButton(1))) {
+				if (lstick.GetRawButton(2)) {
+					CanMechanum(rstick.GetX(),-rstick.GetY(),TurnTo(-90),gyro.GetAngle());
+				}
+				else if (not(rstick.GetRawButton(1))) {
 					CanMechanum(rstick.GetX(), -rstick.GetY(), (lstick.GetX()/2), gyro.GetAngle());
 				}
 				else {
@@ -364,23 +426,165 @@ public:
 
 			frc::Wait(0.005); // wait 5ms to avoid hogging CPU cycles
 		}
-		ChangeColor(i2cnotarget);
+		//ChangeColor(i2cnotarget);
 		ChangeColor(i2cendactions);
 	}
+
+	void SetAll(float val) {
+		m_rf.Set(val);
+		m_rr.Set(val);
+		m_lf.Set(val);
+		m_lr.Set(val);
+	}
+
+	float TurnTo(int theta) {
+			while (theta >= 360) {
+				theta -= 360;
+			}
+			while (theta < 0) {
+				theta += 360;
+			}
+			float robotangle = gyro.GetAngle();
+			while (robotangle >= 360) {
+				robotangle -= 360;
+			}
+			while (robotangle < 0) {
+				robotangle += 360;
+			}
+			float dif = theta - robotangle; // left is negative
+
+			if (ABS(dif)<(3)) {
+				return 0;
+			}
+
+			if (dif<=-180) {
+				dif += 360;
+			}
+			if (dif>180) {
+				dif -= 360;
+			}
+
+			float speed = ((dif/180)*(TurnMax-TurnMin));
+
+			if (speed<0) {
+				speed -= TurnMin;
+			}
+			else if (speed>0) {
+				speed += TurnMin;
+			}
+
+			return speed;
+
+		}
+
+		bool IsAutonomoose() {
+			return IsAutonomous();
+		}
+
+		void Autonomous() { // called during autonomous
+			loaderstop.Set(.56);
+			//autoComplete == true;
+			/*
+			 * Maybe straight gear?
+			CanMechanum(0, .5, 0, gyro.GetAngle());
+			Wait(.6);
+			CanMechanum(0, .3, 0, gyro.GetAngle());
+			Wait(3);
+			CanMechanum(.15, .2, 0, gyro.GetAngle());
+			Wait(1);
+			CanMechanum(-.15, .2, 0, gyro.GetAngle());
+			Wait(1);
+			CanMechanum(.15, .2, 0, gyro.GetAngle());
+			Wait(1);
+			CanMechanum(-.15, .2, 0, gyro.GetAngle());
+			Wait(1);
+			CanMechanum(0, .2, 0, gyro.GetAngle());
+			*/
+
+			/*
+			 * straight for 5 pts
+			CanMechanum(0, .5, 0, 0);
+			Wait(2);
+			SetAll(0);
+			*/
+
+			/*
+			 * Angled gear?
+
+
+
+
+			CanMechanum(0,.5,0,gyro.GetAngle());
+			Wait(1);
+			SetAll(0);
+			Wait(.7);
+			while (TurnTo(-30) != 0 && IsAutonomous) {
+				CanMechanum(0,0,TurnTo(-30),gyro.GetAngle());
+			}
+			SetAll(0);
+			Wait(.5);
+			CanMechanum(0,.3,0,0);
+			Wait(.8);
+			SetAll(0);
+			*/
+			CanMechanum(0,.35,0,gyro.GetAngle());
+			Wait(1.5);
+			SetAll(0);
+			Wait(.7);
+			while ((TurnTo(140) != 0) && IsAutonomous()) {
+				CanMechanum(0,0,TurnTo(140),gyro.GetAngle());
+			}
+			SetAll(0);
+			Wait(.7);
+			AutoTimer.Reset();
+			AutoTimer.Start();
+
+			while (IsAutonomoose()) {
+				CAM();
+
+				if (AutoTimer.Get() >= .5){
+					hopperstop.Set(1);
+					m_agitator.Set(-.7);
+
+					AutoTimer.Stop();
+				}
+				else if (AutoTimer.Get() >= .4){
+					hopperstop.Set(0);
+				}
+
+				CanMechanum((AdjustDistance()), 0, BoilerSpin(), 0);
+				int DesiredEncoderVal = GetDesiredEncoder();//6000;
+				if (visionX.size() > 0) {
+					DesiredEncoderVal = GetDesiredEncoder();
+				}
+				SetShooter(DesiredEncoderVal);
+
+				Wait(.005);
+			}
+
+
+
+		}
 
 private:
 
 	// Drive Motors
-	CanTalonSRX m_rf { 22 };
-	CanTalonSRX m_rr { 23 };
-	CanTalonSRX m_lf { 24 };
-	CanTalonSRX m_lr { 20 };
+		CanTalonSRX m_rf { 25 };
+		CanTalonSRX m_rr { 22 };
+		CanTalonSRX m_lf { 13 };
+		CanTalonSRX m_lr { 24 };
 
+		/*Talon m_rf { 2 };
+		Talon m_lf { 0 };
+		Talon m_rr { 3 };
+		Talon m_lr { 1 };*/
 	// Accessory Motors
 	CanTalonSRX m_shooter { 27 };
 	CanTalonSRX m_loader { 26 };
-	CanTalonSRX m_agitator { 25 };
-	frc::Servo servo { 0 };
+	CanTalonSRX m_agitator { 20 };
+	CanTalonSRX m_climber { 23 }; // def not 13
+	frc::Servo hopperstop { 0 };
+	frc::Servo loaderstop { 1 };
 
 	// Joysticks
 	frc::Joystick rstick { 0 };
@@ -390,6 +594,8 @@ private:
 	// Timers
 	frc::Timer walter; // Lets shooting motor speed up
 	frc::Timer herbert; // stops agitator before shooting motor
+	frc::Timer fatherTime;
+	frc::Timer AutoTimer;
 
 	// Gyro
 	ADXRS450_Gyro gyro { SPI::Port::kOnboardCS0 };
